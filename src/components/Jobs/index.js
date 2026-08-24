@@ -4,6 +4,7 @@ import Loader from 'react-loader-spinner'
 import {BsSearch} from 'react-icons/bs'
 import {Link} from 'react-router-dom'
 import Header from '../Header'
+import './index.css'
 
 const employmentTypesList = [
   {label: 'Full Time', employmentTypeId: 'FULLTIME'},
@@ -19,13 +20,23 @@ const salaryRangesList = [
   {salaryRangeId: '4000000', label: '40 LPA and above'},
 ]
 
+const locationsList = [
+  {locationId: 'Hyderabad', label: 'Hyderabad'},
+  {locationId: 'Bangalore', label: 'Bangalore'},
+  {locationId: 'Chennai', label: 'Chennai'},
+  {locationId: 'Delhi', label: 'Delhi'},
+  {locationId: 'Mumbai', label: 'Mumbai'},
+]
+
 class Jobs extends Component {
   state = {
     profileData: {},
     jobsList: [],
+    filteredJobsList: [],
     searchInput: '',
     employmentType: [],
     salaryRange: '',
+    selectedLocations: [],
     isProfileLoading: true,
     isJobsLoading: true,
     profileError: false,
@@ -39,27 +50,38 @@ class Jobs extends Component {
 
   getProfile = async () => {
     this.setState({isProfileLoading: true, profileError: false})
+
     const jwtToken = Cookies.get('jwt_token')
 
     const response = await fetch('https://apis.ccbp.in/profile', {
-      headers: {Authorization: `Bearer ${jwtToken}`},
+      headers: {
+        Authorization: `Bearer ${jwtToken}`,
+      },
     })
 
     if (response.ok) {
       const data = await response.json()
+
       this.setState({
         profileData: data.profile_details,
         isProfileLoading: false,
       })
     } else {
-      this.setState({profileError: true, isProfileLoading: false})
+      this.setState({
+        profileError: true,
+        isProfileLoading: false,
+      })
     }
   }
 
   getJobs = async () => {
-    this.setState({isJobsLoading: true, jobsError: false})
+    this.setState({
+      isJobsLoading: true,
+      jobsError: false,
+    })
 
     const {employmentType, salaryRange, searchInput} = this.state
+
     const jwtToken = Cookies.get('jwt_token')
 
     const employmentString = employmentType.join(',')
@@ -67,22 +89,51 @@ class Jobs extends Component {
     const apiUrl = `https://apis.ccbp.in/jobs?employment_type=${employmentString}&minimum_package=${salaryRange}&search=${searchInput}`
 
     const response = await fetch(apiUrl, {
-      headers: {Authorization: `Bearer ${jwtToken}`},
+      headers: {
+        Authorization: `Bearer ${jwtToken}`,
+      },
     })
 
     if (response.ok) {
       const data = await response.json()
+
+      this.setState(
+        {
+          jobsList: data.jobs,
+          isJobsLoading: false,
+        },
+        this.filterJobsByLocation,
+      )
+    } else {
       this.setState({
-        jobsList: data.jobs,
+        jobsError: true,
         isJobsLoading: false,
       })
+    }
+  }
+
+  filterJobsByLocation = () => {
+    const {jobsList, selectedLocations} = this.state
+
+    if (selectedLocations.length === 0) {
+      this.setState({
+        filteredJobsList: jobsList,
+      })
     } else {
-      this.setState({jobsError: true, isJobsLoading: false})
+      const updatedJobsList = jobsList.filter(job =>
+        selectedLocations.includes(job.location),
+      )
+
+      this.setState({
+        filteredJobsList: updatedJobsList,
+      })
     }
   }
 
   onSearchChange = event => {
-    this.setState({searchInput: event.target.value})
+    this.setState({
+      searchInput: event.target.value,
+    })
   }
 
   onSearchClick = () => {
@@ -91,15 +142,41 @@ class Jobs extends Component {
 
   onEmploymentChange = id => {
     const {employmentType} = this.state
+
     const updatedList = employmentType.includes(id)
       ? employmentType.filter(each => each !== id)
       : [...employmentType, id]
 
-    this.setState({employmentType: updatedList}, this.getJobs)
+    this.setState(
+      {
+        employmentType: updatedList,
+      },
+      this.getJobs,
+    )
   }
 
   onSalaryChange = id => {
-    this.setState({salaryRange: id}, this.getJobs)
+    this.setState(
+      {
+        salaryRange: id,
+      },
+      this.getJobs,
+    )
+  }
+
+  onLocationChange = location => {
+    const {selectedLocations} = this.state
+
+    const updatedLocations = selectedLocations.includes(location)
+      ? selectedLocations.filter(each => each !== location)
+      : [...selectedLocations, location]
+
+    this.setState(
+      {
+        selectedLocations: updatedLocations,
+      },
+      this.filterJobsByLocation,
+    )
   }
 
   renderProfile() {
@@ -107,7 +184,7 @@ class Jobs extends Component {
 
     if (isProfileLoading) {
       return (
-        <div data-testid="loader">
+        <div className="loader-container" data-testid="loader">
           <Loader type="ThreeDots" color="#ffffff" height="50" width="50" />
         </div>
       )
@@ -115,8 +192,12 @@ class Jobs extends Component {
 
     if (profileError) {
       return (
-        <div>
-          <button type="button" onClick={this.getProfile}>
+        <div className="profile-failure-container">
+          <button
+            type="button"
+            className="retry-button"
+            onClick={this.getProfile}
+          >
             Retry
           </button>
         </div>
@@ -124,20 +205,24 @@ class Jobs extends Component {
     }
 
     return (
-      <div>
-        <img src={profileData.profile_image_url} alt="profile" />
-        <h1>{profileData.name}</h1>
-        <p>{profileData.short_bio}</p>
+      <div className="profile-container">
+        <img
+          src={profileData.profile_image_url}
+          alt="profile"
+          className="profile-image"
+        />
+        <h1 className="profile-name">{profileData.name}</h1>
+        <p className="profile-bio">{profileData.short_bio}</p>
       </div>
     )
   }
 
   renderJobs() {
-    const {jobsList, isJobsLoading, jobsError} = this.state
+    const {filteredJobsList, isJobsLoading, jobsError} = this.state
 
     if (isJobsLoading) {
       return (
-        <div data-testid="loader">
+        <div className="jobs-loader-container" data-testid="loader">
           <Loader type="ThreeDots" color="#ffffff" height="50" width="50" />
         </div>
       )
@@ -145,46 +230,76 @@ class Jobs extends Component {
 
     if (jobsError) {
       return (
-        <div>
+        <div className="failure-container">
           <img
             src="https://assets.ccbp.in/frontend/react-js/failure-img.png"
             alt="failure view"
+            className="failure-image"
           />
-          <h1>Oops! Something Went Wrong</h1>
-          <p>We cannot seem to find the page you are looking for</p>
-          <button type="button" onClick={this.getJobs}>
+
+          <h1 className="failure-heading">Oops! Something Went Wrong</h1>
+
+          <p className="failure-description">
+            We cannot seem to find the page you are looking for
+          </p>
+
+          <button type="button" className="retry-button" onClick={this.getJobs}>
             Retry
           </button>
         </div>
       )
     }
 
-    if (jobsList.length === 0) {
+    if (filteredJobsList.length === 0) {
       return (
-        <div>
+        <div className="no-jobs-container">
           <img
             src="https://assets.ccbp.in/frontend/react-js/no-jobs-img.png"
             alt="no jobs"
+            className="no-jobs-image"
           />
-          <h1>No Jobs Found</h1>
-          <p>We could not find any jobs. Try other filters</p>
+
+          <h1 className="no-jobs-heading">No Jobs Found</h1>
+
+          <p className="no-jobs-description">
+            We could not find any jobs. Try other filters
+          </p>
         </div>
       )
     }
 
     return (
-      <ul>
-        {jobsList.map(job => (
-          <li key={job.id}>
-            <Link to={`/jobs/${job.id}`}>
-              <img src={job.company_logo_url} alt="company logo" />
-              <h1>{job.title}</h1>
-              <p>{job.rating}</p>
-              <p>{job.location}</p>
-              <p>{job.employment_type}</p>
-              <p>{job.package_per_annum}</p>
-              <h1>Description</h1>
-              <p>{job.job_description}</p>
+      <ul className="jobs-list">
+        {filteredJobsList.map(job => (
+          <li key={job.id} className="job-item">
+            <Link to={`/jobs/${job.id}`} className="job-link">
+              <div className="company-details">
+                <img
+                  src={job.company_logo_url}
+                  alt="company logo"
+                  className="company-logo"
+                />
+
+                <div>
+                  <h1 className="job-title">{job.title}</h1>
+                  <p className="rating">⭐ {job.rating}</p>
+                </div>
+              </div>
+
+              <div className="job-details-row">
+                <div className="location-employment">
+                  <p className="job-location">📍 {job.location}</p>
+                  <p className="employment-type">💼 {job.employment_type}</p>
+                </div>
+
+                <p className="package">{job.package_per_annum}</p>
+              </div>
+
+              <hr className="job-divider" />
+
+              <h1 className="description-heading">Description</h1>
+
+              <p className="job-description">{job.job_description}</p>
             </Link>
           </li>
         ))}
@@ -193,60 +308,97 @@ class Jobs extends Component {
   }
 
   render() {
-    const {searchInput} = this.state
+    const {searchInput, selectedLocations} = this.state
 
     return (
       <>
         <Header />
-        <div>
-          {this.renderProfile()}
 
-          <h1>Type of Employment</h1>
-          <ul>
-            {employmentTypesList.map(item => (
-              <li key={item.employmentTypeId}>
-                <input
-                  type="checkbox"
-                  id={item.employmentTypeId}
-                  onChange={() =>
-                    this.onEmploymentChange(item.employmentTypeId)
-                  }
-                />
-                <label htmlFor={item.employmentTypeId}>{item.label}</label>
-              </li>
-            ))}
-          </ul>
+        <div className="jobs-page">
+          <aside className="filters-sidebar">
+            {this.renderProfile()}
 
-          <h1>Salary Range</h1>
-          <ul>
-            {salaryRangesList.map(item => (
-              <li key={item.salaryRangeId}>
-                <input
-                  type="radio"
-                  name="salary"
-                  id={item.salaryRangeId}
-                  onChange={() => this.onSalaryChange(item.salaryRangeId)}
-                />
-                <label htmlFor={item.salaryRangeId}>{item.label}</label>
-              </li>
-            ))}
-          </ul>
+            <hr className="filter-divider" />
 
-          <input
-            type="search"
-            value={searchInput}
-            onChange={this.onSearchChange}
-            placeholder="Search"
-          />
-          <button
-            type="button"
-            data-testid="searchButton"
-            onClick={this.onSearchClick}
-          >
-            <BsSearch />
-          </button>
+            <h1 className="filter-heading">Type of Employment</h1>
 
-          {this.renderJobs()}
+            <ul className="filter-list">
+              {employmentTypesList.map(item => (
+                <li key={item.employmentTypeId} className="filter-item">
+                  <input
+                    type="checkbox"
+                    id={item.employmentTypeId}
+                    onChange={() =>
+                      this.onEmploymentChange(item.employmentTypeId)
+                    }
+                  />
+
+                  <label htmlFor={item.employmentTypeId}>{item.label}</label>
+                </li>
+              ))}
+            </ul>
+
+            <hr className="filter-divider" />
+
+            <h1 className="filter-heading">Salary Range</h1>
+
+            <ul className="filter-list">
+              {salaryRangesList.map(item => (
+                <li key={item.salaryRangeId} className="filter-item">
+                  <input
+                    type="radio"
+                    name="salary"
+                    id={item.salaryRangeId}
+                    onChange={() => this.onSalaryChange(item.salaryRangeId)}
+                  />
+
+                  <label htmlFor={item.salaryRangeId}>{item.label}</label>
+                </li>
+              ))}
+            </ul>
+
+            <hr className="filter-divider" />
+
+            <h1 className="filter-heading">Locations</h1>
+
+            <ul className="filter-list">
+              {locationsList.map(item => (
+                <li key={item.locationId} className="filter-item">
+                  <input
+                    type="checkbox"
+                    id={item.locationId}
+                    checked={selectedLocations.includes(item.locationId)}
+                    onChange={() => this.onLocationChange(item.locationId)}
+                  />
+
+                  <label htmlFor={item.locationId}>{item.label}</label>
+                </li>
+              ))}
+            </ul>
+          </aside>
+
+          <main className="jobs-content">
+            <div className="search-container">
+              <input
+                type="search"
+                value={searchInput}
+                onChange={this.onSearchChange}
+                placeholder="Search"
+                className="search-input"
+              />
+
+              <button
+                type="button"
+                data-testid="searchButton"
+                onClick={this.onSearchClick}
+                className="search-button"
+              >
+                <BsSearch />
+              </button>
+            </div>
+
+            {this.renderJobs()}
+          </main>
         </div>
       </>
     )
